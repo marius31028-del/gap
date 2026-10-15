@@ -1,0 +1,129 @@
+import json
+import os
+
+GRADES = {"A+": 4.5, "A0": 4.0, "B+": 3.5, "B0": 3.0,
+          "C+": 2.5, "C0": 2.0, "D+": 1.5, "D0": 1.0,
+          "F": 0.0, "P": None}  # P는 평점에서 제외
+SAVE_FILE = "gpa_data.json"
+
+
+def load():
+    if os.path.exists(SAVE_FILE):
+        try:
+            with open(SAVE_FILE, encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return []
+
+
+def save(courses):
+    with open(SAVE_FILE, "w", encoding="utf-8") as f:
+        json.dump(courses, f, ensure_ascii=False, indent=2)
+
+
+def calc(courses):
+    """(평균 평점, 반영 학점, 총 점수) 반환"""
+    points = credits = 0.0
+    for c in courses:
+        value = GRADES.get(c["grade"])
+        if value is None or c["credit"] <= 0:
+            continue
+        points += value * c["credit"]
+        credits += c["credit"]
+    gpa = points / credits if credits else 0.0
+    return gpa, credits, points
+
+
+def show(courses):
+    if not courses:
+        print("\n등록된 과목이 없어요.")
+        return
+    print(f"\n{'번호':<4}{'과목명':<16}{'학점':<6}{'성적'}")
+    print("-" * 36)
+    for i, c in enumerate(courses, 1):
+        print(f"{i:<4}{c['name']:<16}{c['credit']:<6}{c['grade']}")
+    gpa, credits, _ = calc(courses)
+    print("-" * 36)
+    print(f"평균 평점: {gpa:.2f} / 4.5   반영 학점: {credits:g}")
+
+
+def add(courses):
+    name = input("과목명: ").strip() or "(이름 없음)"
+    try:
+        credit = float(input("학점 (예: 3): "))
+    except ValueError:
+        print("학점은 숫자로 입력해 주세요.")
+        return
+    grade = input(f"성적 ({', '.join(GRADES)}): ").strip().upper()
+    if grade not in GRADES:
+        print("올바른 성적이 아니에요.")
+        return
+    courses.append({"name": name, "credit": credit, "grade": grade})
+    save(courses)
+    print("추가했어요.")
+
+
+def delete(courses):
+    show(courses)
+    if not courses:
+        return
+    try:
+        n = int(input("삭제할 번호: "))
+        removed = courses.pop(n - 1)
+        save(courses)
+        print(f"'{removed['name']}' 과목을 삭제했어요.")
+    except (ValueError, IndexError):
+        print("올바른 번호가 아니에요.")
+
+
+def simulate(courses):
+    _, credits, points = calc(courses)
+    try:
+        goal = float(input("목표 평점 (예: 4.0): "))
+        left = float(input("남은 학점 (예: 60): "))
+    except ValueError:
+        print("숫자로 입력해 주세요.")
+        return
+    if left <= 0:
+        print("남은 학점은 0보다 커야 해요.")
+        return
+    need = (goal * (credits + left) - points) / left
+    if need > 4.5:
+        best = (points + 4.5 * left) / (credits + left)
+        print(f"남은 {left:g}학점 모두 A+를 받아도 목표에 닿지 못해요. "
+              f"최대 달성 평점은 {best:.2f}예요.")
+    elif need <= 0:
+        print("지금 성적만 유지해도 목표를 넘겨요. F만 피하면 돼요.")
+    else:
+        print(f"남은 {left:g}학점의 평균 평점이 {need:.2f} 이상이어야 해요.")
+        if need >= 4.0:
+            print("A0 이상을 꾸준히 받아야 하는 수준이에요.")
+        elif need >= 3.5:
+            print("B+ 이상을 유지하면 돼요.")
+        else:
+            print("지금 페이스면 충분히 가능해요.")
+
+
+def main():
+    courses = load()
+    menu = {"1": ("과목 보기", show), "2": ("과목 추가", add),
+            "3": ("과목 삭제", delete), "4": ("목표 학점 시뮬레이터", simulate)}
+    print("=== 학점 계산기 (4.5 만점) ===")
+    while True:
+        print()
+        for key, (label, _) in menu.items():
+            print(f"{key}. {label}")
+        print("0. 종료")
+        choice = input("선택: ").strip()
+        if choice == "0":
+            print("종료합니다.")
+            break
+        if choice in menu:
+            menu[choice][1](courses)
+        else:
+            print("0~4 중에서 선택해 주세요.")
+
+
+if __name__ == "__main__":
+    main()
